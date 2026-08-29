@@ -1,0 +1,41 @@
+# Generated distributions and compressed packages
+/deliverables/
+*.zip
+*.rar
+
+# Runtime configuration and collected data
+mysql_config.json
+records.jsonl
+.env
+.env.*
+!.env.example
+*.log
+
+# Credentials and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python/test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE/OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local publishing/worktree staging
+.publish/
+.worktrees/
+
+# Requirement and test run outputs created by the skill suite
+/最新需求/
+/原需求/
+/原图片/
+/归档/
