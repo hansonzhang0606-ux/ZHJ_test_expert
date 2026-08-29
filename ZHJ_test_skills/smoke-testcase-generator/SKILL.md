@@ -151,4 +151,4 @@ Excel structure (24 columns, rows 1-4 are the DMP template header, rows 5+ are c
 
 ## 时间追踪
 
-交付冒烟用例后按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 使用 `--merge-existing` 将节省时间累计到③创建的“生成用例（06）”记录；完成记录前不得进入停止点或下一步。
+进入④、开始生成冒烟用例前，必须按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 确认当前会话仍保留③的原 `session_id`；缺少时立即终止并提示返回原会话（或在当前会话重新完成③），不得先生成④再补造标识。交付冒烟用例后复用该值，同时传入 `--session-id` 和 `--merge-existing`，将节省时间累计到③创建的“生成用例（06）”记录。脚本未找到同会话③记录时也必须终止，不得新增第二条记录；完成记录前不得进入停止点或下一步。

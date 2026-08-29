@@ -299,4 +299,4 @@ py -3 .qwen/skills/md-to-xmind-testcase/scripts/generate_xmind.py \
 
 ## 时间追踪
 
-交付详细用例后按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 创建“生成用例（06）”记录；完成记录前不得进入停止点或下一步。
+进入③、开始生成详细用例前，按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 生成并在当前会话保存唯一 `session_id`。交付详细用例后，以该值传入 `--session-id` 创建“生成用例（06）”记录。记录成功后提醒测试人员“请在当前会话继续完成④生成冒烟用例；不要关闭或新建会话”，并继续保留该标识；完成记录和提醒前不得进入停止点或下一步。

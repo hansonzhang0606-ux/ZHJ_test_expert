@@ -22,9 +22,9 @@ description: >-
 |------|------|
 | 强制反馈 | 工作流每个步骤完成后，强制收集节省时间（不可跳过） |
 | 直接保存 | 员工反馈后立即写入；智慧记运营套件不要求二次确认 |
-| 身份验证 | 盲输入 + 花名册精确匹配，无 fallback |
+| 身份验证 | 盲输入 + 花名册精确匹配；保存前硬校验员工在职及业务线归属，失败不写入 |
 | 多业务线 | 一份 Skill 服务多条业务线，数据按业务线隔离 |
-| 本地优先 | 记录只写本地 JSONL（零网络依赖、永不失败），MySQL 同步由定时任务完成 |
+| 本地优先 | 业务数据先写本地 JSONL、再由定时任务同步 MySQL；但保存前的实时花名册校验仍依赖 MySQL，校验失败必须拒写 |
 | MySQL 同步 | 本地 JSONL 幂等 upsert 到共享 MySQL（离线可用，pymysql 已打包） |
 | 可视化报告 | HTML 报告（内置 JS 筛选面板）+ CSV 导出，报告必展示 |
 | 双宿主兼容 | WorkBuddy（`present_files` 展示）与 IDE（VSCode/OpenCode/Claude Code 等，给文件路径）均可运行 |
@@ -111,12 +111,16 @@ python scripts/sync_to_mysql.py --biz-line "智慧记+运营系统"
 ### 身份验证
 - 会话开始时 AI 查询 MySQL `agent_team_roster` 表，盲输入姓名精确匹配
 - 表内不读取 `biz_line_code`；编码由 `biz_line_helper.py` 根据中文 `biz_line` 派生
-- 匹配失败直接拒绝服务，无 fallback
-- 会话启动时 AI 自动检查 `mysql_config.json`：缺失则向用户索要密码并**自动调用 `init_mysql_config.py` 完成初始化**（无需手动开 CMD），不阻塞服务
+- `record_time_saved.py` 每次保存前硬校验姓名、在职状态和所选中文业务线归属；查询失败或校验失败直接拒绝写入并提示联系管理员，无 fallback、无跳过参数
+- 会话启动时 AI 自动检查 `mysql_config.json`：缺失则向用户索要密码并**自动调用 `init_mysql_config.py` 完成初始化**（无需手动开 CMD）；配置或花名册连接恢复前可以继续非追踪工作，但不得保存任何时间记录
+
+### ③/④会话合并
+- “生成用例（06）”必须传 `--session-id`；③、④只允许复用当前会话的同一值
+- ③保存后原样展示脚本的继续④提醒；④找不到同会话③记录时终止，不新增记录
 
 ### 存储模式（storage_mode）
-- `mysql`（默认）：本地 JSONL 兜底 + 定时任务同步共享 MySQL，供团队汇总
-- `local`：仅本地 JSONL（无集中存储，开箱即用）
+- `mysql`（默认）：身份校验通过后写本地 JSONL + 定时任务同步共享 MySQL，供团队汇总
+- `local`：仅改变时间数据的存储/同步方式；保存前仍必须连接 MySQL 完成身份及业务线校验
 - `excel`：本地 JSONL + Excel 文件（可选附加）
 
 ## 六、详细执行规则

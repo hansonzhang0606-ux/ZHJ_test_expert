@@ -4,8 +4,12 @@
 时间节省记录脚本 v3（通用多业务线版）
 在工作流每个步骤完成后，记录该步骤为人类员工节省了多少时间。
 
+智慧记运营套件约束:
+  - 测试人员反馈节省时间后直接记录，不再二次确认
+  - 每次保存前硬校验员工在职且所选中文业务线属于该员工
+  - 生成用例（06）的③、④必须使用同一显式 session_id 合并
+
 v3 改进:
-  - 二次确认：脚本仅负责记录，确认逻辑由 AI 在调用前完成
   - 统一存储单位：底层始终以小时存储，time_saved_pd 为换算值
   - Excel 同步：storage_mode=excel 时自动追加到 Excel 文件
   - 花名册校验 + 参考时间展示
@@ -32,7 +36,8 @@ v3 改进:
     --step "用例细化" \
     --step-code "06" \
     --person-days 1.5 \
-    --biz-line "智慧记+运营系统"
+    --biz-line "智慧记+运营系统" \
+    --session-id "ZHJ-20260829T142500-a1b2c3d4"
 
 数据存储位置:
   ~/.workbuddy/data/time-tracking/{biz_line}/records.jsonl
@@ -101,7 +106,7 @@ def load_team_roster() -> dict:
 
     MySQL 表只含中文 biz_line；load_roster.py 聚合多行并派生编码后，返回兼容格式：
     {"members": [{"name", "role", "active", "biz_line_code", "biz_line"}, ...], "error": str|None}
-    MySQL 配置缺失 / 连接失败时返回空花名册 + error 信息（上层可降级处理）。
+    MySQL 配置缺失 / 连接失败时返回空花名册 + error 信息（上层必须硬拦截）。
     """
     global _roster_cache
     if _roster_cache is not None:
@@ -128,28 +133,27 @@ def load_team_roster() -> dict:
     return _roster_cache
 
 
-def validate_employee(employee: str) -> tuple:
-    """实时校验员工身份（MySQL agent_team_roster 表）
+def validate_employee_for_biz_line(employee: str, biz_line: str) -> tuple:
+    """实时校验员工身份及所选中文业务线（MySQL agent_team_roster 表）。
 
     返回 (is_valid, status, error_or_none)。status 取值：
-      - "在职"：active=1，可正常服务
+      - "在职且业务线已授权"：active=1 且 biz_line 属于该员工
       - "已离职/停用"：active=0，已无权限
       - "不在花名册中"：从未入库
+      - "业务线未授权"：员工存在，但所选 biz_line 不属于该员工
       - "花名册查询失败"：MySQL 配置缺失或连接失败
     """
     roster = load_team_roster()
     if roster.get("error"):
         return False, "花名册查询失败", roster["error"]
-    members = roster.get("members", [])
-    active_names = [m["name"] for m in members if m.get("active", True)]
-    all_names = [m["name"] for m in members]
-
-    if employee in active_names:
-        return True, "在职", None
-    elif employee in all_names:
-        return False, "已离职/停用", None
-    else:
+    member = next((m for m in roster.get("members", []) if m.get("name") == employee), None)
+    if member is None:
         return False, "不在花名册中", None
+    if not member.get("active", True):
+        return False, "已离职/停用", None
+    if biz_line not in member.get("biz_line", []):
+        return False, "业务线未授权", None
+    return True, "在职且业务线已授权", None
 
 
 def get_data_dir(biz_line: str) -> str:
@@ -166,7 +170,7 @@ def get_records_path(biz_line: str) -> str:
 
 
 def merge_latest_record(records_path: str, incoming: dict) -> dict | None:
-    """将同一会话中相同员工、故事、业务线和步骤的最后一条记录与本次数据累计。"""
+    """按显式 session_id 合并同一会话中③、④的“生成用例（06）”记录。"""
     if not os.path.exists(records_path):
         return None
     with open(records_path, "r", encoding="utf-8") as f:
@@ -174,7 +178,10 @@ def merge_latest_record(records_path: str, incoming: dict) -> dict | None:
     match = None
     for index in range(len(records) - 1, -1, -1):
         candidate = records[index]
-        if all(candidate.get(key, "") == incoming.get(key, "") for key in ("biz_line", "employee", "user_story", "step_code")):
+        if all(
+            candidate.get(key, "") == incoming.get(key, "")
+            for key in ("session_id", "biz_line", "employee", "user_story", "step_code")
+        ):
             match = index
             break
     if match is None:
@@ -208,26 +215,21 @@ def record(
     agent_start_time: str = "",
     agent_end_time: str = "",
     agent_duration_minutes: float = None,
-    skip_validation: bool = False,
+    session_id: str = "",
     merge_existing: bool = False,
 ):
     """记录一条时间节省数据（biz_line 未指定时自动从配置解析）"""
     if not biz_line:
         from biz_line_helper import resolve_biz_line
         biz_line = resolve_biz_line("")
-    # 花名册校验（实时查 MySQL agent_team_roster）
-    if not skip_validation:
-        valid, status, err = validate_employee(employee)
-        if not valid and status == "花名册查询失败":
-            print(f"⚠️  警告：花名册查询失败（{err}），无法校验员工身份。", file=sys.stderr)
-            print(f"   本次记录仍会保存，但建议核实。", file=sys.stderr)
-        elif not valid and status == "不在花名册中":
-            print(f"⚠️  警告：员工 '{employee}' 不在花名册中。", file=sys.stderr)
-            print(f"   花名册在职人员：{', '.join(m['name'] for m in load_team_roster().get('members', []) if m.get('active', True))}", file=sys.stderr)
-            print(f"   如确为此员工，请联系管理员直接 INSERT/UPDATE `agent_team_roster` 表。", file=sys.stderr)
-            print(f"   本次记录仍会保存，但建议核实。", file=sys.stderr)
-        elif not valid and status == "已离职/停用":
-            print(f"⚠️  警告：员工 '{employee}' 在花名册中标记为停用。", file=sys.stderr)
+    # 身份与所选业务线必须同时通过实时花名册校验；失败时禁止写入。
+    valid, status, err = validate_employee_for_biz_line(employee, biz_line)
+    if not valid:
+        detail = f"（{err}）" if err else ""
+        raise PermissionError(
+            f"身份验证失败：{status}{detail}。员工：{employee}；业务线：{biz_line}。"
+            "本次时间记录未保存，请联系管理员维护 agent_team_roster。"
+        )
 
     # 统一换算为小时（v3：底层存储始终为小时）
     time_hours = 0.0
@@ -253,6 +255,12 @@ def record(
                 step_code = code
                 break
 
+    session_id = (session_id or "").strip()
+    if step_code == "06" and not session_id:
+        raise ValueError(
+            "生成用例（06）必须提供 --session-id。③和④必须在当前会话使用同一会话标识。"
+        )
+
     now = datetime.now(timezone(timedelta(hours=8)))
 
     record = {
@@ -264,6 +272,7 @@ def record(
         "user_story_code": extract_user_story_code(user_story),
         "step": step,
         "step_code": step_code,
+        "session_id": session_id,
         "time_saved_hours": time_hours,
         "time_saved_pd": time_pd,
         "total_hours": total_hours,
@@ -275,8 +284,13 @@ def record(
 
     records_path = get_records_path(biz_line)
 
-    merged_record = merge_latest_record(records_path, record) if merge_existing else None
-    if merged_record is not None:
+    if merge_existing:
+        merged_record = merge_latest_record(records_path, record)
+        if merged_record is None:
+            raise LookupError(
+                "未找到当前会话中③生成测试用例的记录，④不能跨会话合并。"
+                "请返回原会话继续，或先在当前会话重新完成③。"
+            )
         record = merged_record
     else:
         with open(records_path, "a", encoding="utf-8") as f:
@@ -295,8 +309,12 @@ def record(
     if code:
         print(f"   故事编号: {code}")
     print(f"   步骤: {step} ({step_code})")
-    print(f"   节省时间: {time_pd} 人天（{time_hours} 小时）")
-    print(f"   存储单位: 小时（{total_hours}h）")
+    print(f"   节省时间: {record['time_saved_pd']} 人天（{record['time_saved_hours']} 小时）")
+    print(f"   存储单位: 小时（{record['total_hours']}h）")
+    if step_code == "06":
+        print(f"   会话标识: {session_id}")
+        if not merge_existing:
+            print("🔔 请在当前会话继续完成④生成冒烟用例；不要关闭或新建会话。")
     if agent_start_time and agent_end_time:
         print(f"   智能体执行: {agent_start_time} → {agent_end_time}（{agent_duration_minutes} 分钟）")
     print(f"   业务线: {biz_line}")
@@ -372,7 +390,7 @@ def main():
     parser.add_argument("--agent-start-time", default="", help="智能体开始处理本步骤的 ISO 时间戳（如 2026-08-27T09:05:00+08:00）")
     parser.add_argument("--agent-end-time", default="", help="智能体完成本步骤的 ISO 时间戳（如 2026-08-27T09:17:30+08:00）")
     parser.add_argument("--agent-duration-minutes", type=float, default=None, help="智能体实际执行耗时（分钟）")
-    parser.add_argument("--skip-validation", action="store_true", help="跳过花名册校验")
+    parser.add_argument("--session-id", default="", help="当前会话标识；生成用例（06）的③和④必须传入同一值")
     parser.add_argument("--merge-existing", action="store_true", help="将同一会话内相同步骤的最新记录累计更新")
 
     args = parser.parse_args()
@@ -381,21 +399,25 @@ def main():
         print("错误：必须指定 --hours 或 --person-days", file=sys.stderr)
         sys.exit(1)
 
-    record(
-        employee=args.employee,
-        user_story=args.user_story,
-        step=args.step,
-        step_code=args.step_code,
-        hours=args.hours,
-        person_days=args.person_days,
-        biz_line=args.biz_line,
-        remark=args.remark,
-        agent_start_time=args.agent_start_time,
-        agent_end_time=args.agent_end_time,
-        agent_duration_minutes=args.agent_duration_minutes,
-        skip_validation=args.skip_validation,
-        merge_existing=args.merge_existing,
-    )
+    try:
+        record(
+            employee=args.employee,
+            user_story=args.user_story,
+            step=args.step,
+            step_code=args.step_code,
+            hours=args.hours,
+            person_days=args.person_days,
+            biz_line=args.biz_line,
+            remark=args.remark,
+            agent_start_time=args.agent_start_time,
+            agent_end_time=args.agent_end_time,
+            agent_duration_minutes=args.agent_duration_minutes,
+            session_id=args.session_id,
+            merge_existing=args.merge_existing,
+        )
+    except (PermissionError, ValueError, LookupError) as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

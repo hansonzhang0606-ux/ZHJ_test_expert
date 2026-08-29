@@ -28,14 +28,15 @@
 - Modify: `ZHJ_test_skills/time-tracking-skill/config/time_tracking_config.yaml`
 
 **Interfaces:**
-- Produces: `record(..., merge_existing=False)`；当 `merge_existing=True` 时更新同会话员工、故事、步骤、业务线的最后一条记录。
+- Produces: `record(..., session_id="", merge_existing=False)`；步骤 `06` 强制要求显式 `session_id`。当 `merge_existing=True` 时只更新同一显式会话、员工、故事、步骤、业务线的最后一条记录。
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 def test_merge_existing_accumulates_stage_three_and_four(tmp_path, monkeypatch):
-    first = record('李静', 'PRJ-1 示例', '生成用例', '06', hours=2, biz_line='智慧记+运营系统', skip_validation=True)
-    merged = record('李静', 'PRJ-1 示例', '生成用例', '06', hours=1.5, biz_line='智慧记+运营系统', skip_validation=True, merge_existing=True)
+    monkeypatch.setattr(module, 'load_team_roster', authorized_roster)
+    first = record('李静', 'PRJ-1 示例', '生成用例', '06', hours=2, biz_line='智慧记+运营系统', session_id='session-001')
+    merged = record('李静', 'PRJ-1 示例', '生成用例', '06', hours=1.5, biz_line='智慧记+运营系统', session_id='session-001', merge_existing=True)
     assert merged['time_saved_hours'] == 3.5
     assert len(read_records('智慧记+运营系统')) == 1
 ```
@@ -48,7 +49,7 @@ Expected: FAIL because `merge_existing` is unsupported.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add the `--merge-existing` CLI flag and, before appending, replace the latest matching JSONL row using the session/employee/story/step/business-line match. Add codes 00, 05 and 08 plus their reference intervals.
+Add the `--session-id` and `--merge-existing` CLI flags and, before appending, replace the latest matching JSONL row using the explicit-session/employee/story/step/business-line match. Remove every validation-bypass path and hard-block writes unless the selected Chinese business line is assigned to the active employee. Add codes 00, 05 and 08 plus their reference intervals.
 
 - [ ] **Step 4: Run test to verify it passes**
 
