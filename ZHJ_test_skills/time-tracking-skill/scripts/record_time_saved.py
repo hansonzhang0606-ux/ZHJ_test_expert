@@ -7,7 +7,7 @@
 智慧记运营套件约束:
   - 测试人员反馈节省时间后直接记录，不再二次确认
   - 每次保存前硬校验员工在职且所选中文业务线属于该员工
-  - 生成用例（06）的③、④必须使用同一显式 session_id 合并
+  - 生成用例（06）必须使用显式 session_id；③、④同会话时合并，否则各自独立记录
 
 v3 改进:
   - 统一存储单位：底层始终以小时存储，time_saved_pd 为换算值
@@ -51,17 +51,7 @@ import re
 import sys
 from datetime import datetime, timezone, timedelta
 
-
-# 步骤代码映射
-STEP_MAP = {
-    "00": "导出需求",
-    "01": "文档整理",
-    "02": "需求评审",
-    "05": "AI 对比入库",
-    "06": "生成用例",
-    "07": "知识入库",
-    "08": "SVN 归档上传",
-}
+from step_helper import normalize_step
 
 # 参考时间表
 REFERENCE_TIMES = {
@@ -246,14 +236,8 @@ def record(
     time_pd = round(total_hours / HOURS_PER_PD, 2)
     time_hours = total_hours
 
-    # 自动补全步骤名称
-    if step_code and not step:
-        step = STEP_MAP.get(step_code, step_code)
-    if step and not step_code:
-        for code, name in STEP_MAP.items():
-            if name == step:
-                step_code = code
-                break
+    # 已知编码始终使用统一步骤名称，避免不同调用方写出多种 step 值。
+    step, step_code = normalize_step(step, step_code)
 
     session_id = (session_id or "").strip()
     if step_code == "06" and not session_id:
@@ -284,14 +268,18 @@ def record(
 
     records_path = get_records_path(biz_line)
 
+    merged_existing = False
+    standalone_stage_four = False
     if merge_existing:
         merged_record = merge_latest_record(records_path, record)
-        if merged_record is None:
-            raise LookupError(
-                "未找到当前会话中③生成测试用例的记录，④不能跨会话合并。"
-                "请返回原会话继续，或先在当前会话重新完成③。"
-            )
-        record = merged_record
+        if merged_record is not None:
+            record = merged_record
+            merged_existing = True
+        else:
+            # 当前会话没有③时，将④作为独立的“生成用例（06）”记录保存。
+            with open(records_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            standalone_stage_four = True
     else:
         with open(records_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -315,6 +303,10 @@ def record(
         print(f"   会话标识: {session_id}")
         if not merge_existing:
             print("🔔 请在当前会话继续完成④生成冒烟用例；不要关闭或新建会话。")
+        elif standalone_stage_four:
+            print("ℹ️ 当前会话没有③记录，已将④的节省时间独立记录为生成用例（06）。")
+        elif merged_existing:
+            print("ℹ️ 已将④的节省时间累计到当前会话的③记录。")
     if agent_start_time and agent_end_time:
         print(f"   智能体执行: {agent_start_time} → {agent_end_time}（{agent_duration_minutes} 分钟）")
     print(f"   业务线: {biz_line}")
@@ -390,8 +382,8 @@ def main():
     parser.add_argument("--agent-start-time", default="", help="智能体开始处理本步骤的 ISO 时间戳（如 2026-08-27T09:05:00+08:00）")
     parser.add_argument("--agent-end-time", default="", help="智能体完成本步骤的 ISO 时间戳（如 2026-08-27T09:17:30+08:00）")
     parser.add_argument("--agent-duration-minutes", type=float, default=None, help="智能体实际执行耗时（分钟）")
-    parser.add_argument("--session-id", default="", help="当前会话标识；生成用例（06）的③和④必须传入同一值")
-    parser.add_argument("--merge-existing", action="store_true", help="将同一会话内相同步骤的最新记录累计更新")
+    parser.add_argument("--session-id", default="", help="当前会话标识；生成用例（06）必须传入")
+    parser.add_argument("--merge-existing", action="store_true", help="④尝试合并同会话③；未找到时将④独立保存")
 
     args = parser.parse_args()
 

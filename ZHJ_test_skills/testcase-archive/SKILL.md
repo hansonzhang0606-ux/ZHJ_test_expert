@@ -16,7 +16,7 @@ description: AI 自动对比 AI 生成的详细测试用例 XMind 与人工评�
 5. 将最终用例合并入库到知识库
 6. 更新 `INDEX.md` 和 `EVOLUTION_LOG.md`
 
-> 本 Skill 对应 `QWEN.md` 中标准流程的第 ④ 步：AI 自动对比与入库。
+> 在智慧记运营八阶段工作流中，本 Skill 对应第⑤步：AI 对比入库（`05`）。
 
 ---
 

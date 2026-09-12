@@ -3,7 +3,7 @@
 > 从「效贷测试专家」v1.5.0 抽取而来的独立子 Skill，可嵌入任意测试团队的 Skill 套件。
 > 用于追踪并量化测试工作中 AI 为每位测试人员节省的时间。
 >
-> **存储口径（v5.3）**：记录只写本地 JSONL → 定时任务（每日 09:00 / 12:00 / 18:00）幂等同步到
+> **存储口径（v5.10）**：记录只写本地 JSONL → 定时任务（每日 09:00 / 12:00 / 18:00）幂等同步到
 > **共享 MySQL 数据库**。不依赖腾讯文档连接器。
 >
 > **花名册来源（v1.5.2）**：身份识别**实时查询 MySQL `agent_team_roster` 表**，
@@ -55,7 +55,7 @@ default_biz_line: "智慧记+运营系统"   # 或 AI进销存 / 智慧记零售
 > `agent_team_roster` 表每行只保存中文字段 `biz_line`，同一员工可有多行业务线记录。查询脚本按姓名聚合这些中文业务线，并通过 `biz_line_helper.py` 在运行时派生 `biz_line_code` 数组。
 > 身份确认时，AI 根据聚合结果**列出编号选项**让成员输入数字选择（数据库中 `biz_line=国际版Ailit` 时，派生编码为 `AILIT`），
 > 避免自由文本回答笼统导致匹配不准确；`default_biz_line` 仅作为单业务线成员的默认值。
-> 每次保存前脚本会硬校验员工在职及所选中文业务线归属；失败或花名册查询异常时不写记录，并提示联系管理员。生成用例（06）的③、④还必须传入当前会话的同一 `session_id`。
+> 每次保存前脚本会硬校验员工在职及所选中文业务线归属；失败或花名册查询异常时不写记录，并提示联系管理员。生成用例（06）必须传入显式 `session_id`：同会话③④合并，只有③或只有④时独立记录，不跨会话合并。
 
 ### 第 3 步：填写花名册
 
@@ -189,4 +189,5 @@ time-tracking-skill/
 - v5.6：team_roster.yaml 的 members 名单清空（运行时身份识别早已迁至 MySQL `agent_team_roster`，yaml 不再作为数据源）；同步将全部文档/脚本中「改 yaml → `sync_roster_to_mysql.py` 推 MySQL」的维护口径统一改为「管理员直接 INSERT/UPDATE MySQL `agent_team_roster` 表」，并给 `sync_roster_to_mysql.py` 加【已弃用】提示（误运行不改动 MySQL 数据）；zip 内嵌的 team_roster.yaml 随之更新为空 members。
 - v5.7：时间记录增加 `agent_start_time` / `agent_end_time` / `agent_duration_minutes` 三个字段，`record_time_saved.py` 新增对应 CLI 参数，`sync_to_mysql.py` 在 upsert 时同步写入 MySQL `agent_time_tracking` 表，解决表中该三字段长期为 NULL 的问题；`prompts/time_tracking.md` 明确要求 AI 在步骤开始/结束时采集智能体执行耗时并传入脚本。
 - v5.8：定时任务自动注册从「提示词内联 3 条带 `<scripts目录>` 占位符的 schtasks 命令（模型无法可靠填出路径，导致其他电脑/测试人员从未真正建出任务）」改为**确定性脚本调用** `python scripts/register_sync_tasks.py --biz-line {biz_line}`；新增 `scripts/register_sync_tasks.py`（用 `__file__` 自定位 `sync_task.bat`、按业务线幂等注册 早/午/晚 三任务、注册失败给明确提示），彻底解决跨机器自动建任务的根因；注册时机从「MySQL 配置就绪后」提前到「业务线确定后」。
+- v5.10：统一完整步骤映射（新增 `00/05/08`，其中⑤=`AI 对比入库/05`、⑦=`SVN 归档上传/08`）；③与④改为可各自独立记录，同一会话两步均完成时合并为一条“生成用例（06）”，并提供 `update_step_metadata.py` 更新数据库字段注释。
 - 抽取日期：2026-08-18

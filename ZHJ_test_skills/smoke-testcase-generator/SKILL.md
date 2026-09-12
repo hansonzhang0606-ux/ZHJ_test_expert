@@ -15,7 +15,7 @@ Extract cases of a specified priority (default P0) from a **reviewed** test-case
 - User asks to generate smoke test cases / 冒烟用例 from reviewed test cases
 - User needs to export P0 (or other priority) cases to Excel for DMP import
 - User mentions "生成冒烟用例", "冒烟测试用例", "P0用例导出", "导出冒烟用例"
-- After the testcase-archive step (④) completes and reviewed XMind is finalized
+- After the reviewed XMind is finalized and the user requests stage ④
 
 ## Prerequisites
 
@@ -134,8 +134,8 @@ Excel structure (24 columns, rows 1-4 are the DMP template header, rows 5+ are c
 | Skill | Relationship | Order |
 |-------|-------------|-------|
 | md-to-xmind-testcase | Predecessor | Produces the AI XMind (③) |
-| testcase-archive | Predecessor | Produces the reviewed XMind (④) |
-| **smoke-testcase-generator** | **Current** | Extracts P0 → DMP Excel (after ④) |
+| testcase-archive | Related | AI comparison and knowledge-base import is stage ⑤ |
+| **smoke-testcase-generator** | **Current** | Extracts P0 → DMP Excel in stage ④ |
 
 ## Notes
 
@@ -151,4 +151,4 @@ Excel structure (24 columns, rows 1-4 are the DMP template header, rows 5+ are c
 
 ## 时间追踪
 
-进入④、开始生成冒烟用例前，必须按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 确认当前会话仍保留③的原 `session_id`；缺少时立即终止并提示返回原会话（或在当前会话重新完成③），不得先生成④再补造标识。交付冒烟用例后复用该值，同时传入 `--session-id` 和 `--merge-existing`，将节省时间累计到③创建的“生成用例（06）”记录。脚本未找到同会话③记录时也必须终止，不得新增第二条记录；完成记录前不得进入停止点或下一步。
+进入④、开始生成冒烟用例前，按 `../time-tracking-skill/references/zhj-eight-stage-workflow.md` 处理会话标识：若当前会话已有③的 `session_id`，必须原样复用；若当前会话没有③，则生成新的当前会话标识。交付冒烟用例后传入 `--session-id` 和 `--merge-existing`：找到同会话③时累计到③创建的“生成用例（06）”记录，否则将④独立保存为一条“生成用例（06）”记录。不得使用其他会话的标识；完成记录前不得进入停止点或下一步。

@@ -32,6 +32,7 @@ if os.path.isdir(os.path.join(SCRIPT_DIR, "pymysql")):
     sys.path.insert(0, SCRIPT_DIR)
 
 from biz_line_helper import resolve_biz_line
+from step_helper import normalize_step
 
 try:
     import pymysql
@@ -139,7 +140,8 @@ def read_jsonl_records(biz_line):
 
 def upsert_record(conn, table, record, biz_line, biz_line_code):
     """幂等 upsert 一条记录（record_key 唯一键兜底）"""
-    record_key = compute_record_key(record, biz_line_code)
+    step, step_code = normalize_step(record.get("step", ""), record.get("step_code", ""))
+    record_key = compute_record_key({**record, "step_code": step_code}, biz_line_code)
     user_story_code = extract_user_story_code(record)
     ts = normalize_timestamp(record.get("timestamp"))
     date_val = record.get("date", "") or (ts[:10] if ts else "")
@@ -174,8 +176,8 @@ def upsert_record(conn, table, record, biz_line, biz_line_code):
         "employee": record.get("employee", ""),
         "user_story": record.get("user_story", ""),
         "user_story_code": user_story_code,
-        "step": record.get("step", ""),
-        "step_code": record.get("step_code", ""),
+        "step": step,
+        "step_code": step_code,
         "time_saved_hours": float(record.get("time_saved_hours", 0)),
         "time_saved_pd": float(record.get("time_saved_pd", 0)),
         "total_hours": float(record.get("total_hours", 0)),

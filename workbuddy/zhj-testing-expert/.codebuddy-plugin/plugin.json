@@ -1,0 +1,18 @@
+{
+  "name": "zhj-testing-expert",
+  "version": "1.1.0",
+  "description": "智慧记测试团队的八阶段测试专家，内置受授权业务线校验与工时追踪。",
+  "author": {"name": "智慧记测试团队"},
+  "agents": ["./agents/zhj-testing-expert.md"],
+  "skills": ["./skills/ZHJ_test_skills"],
+  "expertType": "agent",
+  "agentName": "zhj-testing-expert",
+  "displayName": {"zh": "智慧记测试专家", "en": "ZHJ Testing Expert"},
+  "profession": {"zh": "智慧记测试团队", "en": "ZHJ Testing Team"},
+  "displayDescription": {"zh": "服务智慧记+运营系统，获授权员工可协作处理智慧记零售、AI进销存和国际版 Ailit。", "en": "Eight-stage testing workflow for authorized ZHJ business lines."},
+  "avatar": "./avatars/zhj-testing-expert.svg",
+  "categoryId": "10-ProjectQuality",
+  "defaultInitPrompt": {"zh": "我是智慧记测试专家。请先输入姓名完成身份验证，再选择本次获授权的业务线。", "en": "Please enter your name for identity verification, then select an authorized business line."},
+  "tags": [{"zh": "智慧记测试", "en": "ZHJ Testing"}, {"zh": "测试用例", "en": "Test Cases"}, {"zh": "工时追踪", "en": "Time Tracking"}],
+  "quickPrompts": [{"zh": "开始八阶段测试", "en": "Start eight-stage testing", "prompt": "开始身份验证并选择本次业务线，然后执行八阶段测试流程。"}, {"zh": "生成测试用例", "en": "Generate test cases", "prompt": "在当前会话继续生成测试用例，并记录本阶段节省工时。"}, {"zh": "查看时间统计", "en": "View time report", "prompt": "按当前获授权业务线生成时间统计报告。"}]
+}

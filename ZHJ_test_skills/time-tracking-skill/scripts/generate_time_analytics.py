@@ -25,21 +25,11 @@ import sys
 from datetime import datetime
 from collections import defaultdict
 
+from step_helper import STEP_MAP, STEP_NAME_ALIASES, normalize_step
 
 HOURS_PER_PD = 8.0
-STEP_ORDER = ["01", "02", "04", "06", "07"]
-STEP_NAMES = {
-    "01": "文档整理",
-    "02": "需求评审",
-    "04": "生成测试点",
-    "06": "用例细化",
-    "07": "知识入库",
-}
-# 兼容旧数据中使用的步骤名称别名
-STEP_NAME_ALIASES = {
-    "生成用例": "用例细化",
-    "入库知识库": "知识入库",
-}
+STEP_ORDER = list(STEP_MAP.keys())
+STEP_NAMES = dict(STEP_MAP)
 
 
 def get_data_dir(biz_line: str) -> str:
@@ -117,7 +107,7 @@ def generate_csv(records: list, biz_line: str, output_path: str):
                 r.get("biz_line", ""),
                 r.get("employee", ""),
                 r.get("user_story", ""),
-                r.get("step", ""),
+                normalize_step(r.get("step", ""), r.get("step_code", ""))[0],
                 r.get("step_code", ""),
                 r.get("time_saved_hours", 0),
                 r.get("time_saved_pd", 0),
@@ -141,7 +131,7 @@ def compute_stats(records: list) -> dict:
     for r in records:
         emp = r.get("employee", "未知")
         story = r.get("user_story", "未知")
-        step = r.get("step", "未知")
+        step = normalize_step(r.get("step", "未知"), r.get("step_code", ""))[0]
         date = r.get("date", "未知")
         hours = r.get("total_hours", r.get("time_saved_hours", 0))
         pd = r.get("time_saved_pd", 0)
@@ -196,7 +186,12 @@ def compute_stats(records: list) -> dict:
 
 
 def generate_html(records: list, biz_line: str, output_path: str, person_name: str = ""):
-    """生成 HTML 可视化报告
+    """生成 HTML 可视化报告。"""
+    records = [
+        {**r, "step": normalize_step(r.get("step", ""), r.get("step_code", ""))[0]}
+        for r in records
+    ]
+    """
 
     Args:
         records: 时间节省记录列表
@@ -948,7 +943,8 @@ def main():
 
     by_step_summary = defaultdict(float)
     for r in records:
-        by_step_summary[r.get("step", "")] += r.get("total_hours", r.get("time_saved_hours", 0))
+        step = normalize_step(r.get("step", ""), r.get("step_code", ""))[0]
+        by_step_summary[step] += r.get("total_hours", r.get("time_saved_hours", 0))
     print(f"\n   按步骤分布:")
     for step in sorted(by_step_summary.keys(), key=_step_sort_key):
         print(f"     {step}: {by_step_summary[step]/HOURS_PER_PD:.1f} 人天（{by_step_summary[step]:.1f} 小时）")
