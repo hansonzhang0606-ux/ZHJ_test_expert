@@ -47,10 +47,10 @@
 （**智慧记有三个子业务线，须填具体子业务线全称，不可填统称"智慧记"**）：
 
 ```yaml
-default_biz_line: "智慧记+运营系统"   # 或 AI进销存 / 智慧记零售
+default_biz_line: "智慧记+运营系统"   # 或 智慧记零售 / AI进销存
 ```
 
-支持的业务线：`效贷` / `泾渭云` / `效融` / `小贷` / `智慧记+运营系统`(ZHJ) / `AI进销存`(AIJXC) / `智慧记零售`(ZHJLS) / `国际版Ailit`(AILIT)
+支持的业务线：`效贷` / `泾渭云` / `效融` / `小贷` / `智慧记+运营系统`(ZHJ) / `智慧记零售`(ZHJLS) / `AI进销存`(AIJXC) / `国际版Ailit`(AILIT)
 
 > `agent_team_roster` 表每行只保存中文字段 `biz_line`，同一员工可有多行业务线记录。查询脚本按姓名聚合这些中文业务线，并通过 `biz_line_helper.py` 在运行时派生 `biz_line_code` 数组。
 > 身份确认时，AI 根据聚合结果**列出编号选项**让成员输入数字选择（数据库中 `biz_line=国际版Ailit` 时，派生编码为 `AILIT`），
@@ -184,10 +184,83 @@ time-tracking-skill/
 - v1.5.2：**身份识别从「读 `team_roster.yaml`」改为「实时查 MySQL `agent_team_roster`」**——管理员直接维护该表的中文 `biz_line` 多行记录；`load_roster.py` 按姓名聚合并派生编码；会话启动顺序调整为「先 MySQL 配置检查 → 再花名册查询 → 再身份验证」
 - 业务线编号选择：多业务线成员身份确认时，AI 列出编号选项让成员输入数字选择（`biz_line_helper.py` 新增 `code_to_biz_line` 反向映射），避免自由文本回答笼统导致匹配不准确
 - v5.3：`sync_task.bat` 修复 Windows 兼容性（GBK 编码 + CRLF 换行 + Python 自动探测 + `%~dp0` 定位），解决 schtasks 触发的 cmd.exe 用 GBK(936) 读取 UTF-8/LF bat 导致中文乱码、找不到命令、路径找不到的问题；定时任务注册由「人工手动」升级为「AI 自动完成」（会话启动检测未注册 → 自动 `schtasks /create` 注册早/午/晚三任务）
-- v5.5：sync_task.bat 升级为接收第 1 个参数 %1 决定业务线，定时任务 /tr 末尾传入 {biz_line}，同一份 bat 复用服务多业务线（效贷/泾渭云/效融/小贷/智慧记+运营系统/AI进销存/智慧记零售），彻底去掉硬编码；配套效贷测试专家 agent v1.6.3 在业务线确定后强制校验 mysql_config.json 真实生成才算闭环。
+- v5.5：sync_task.bat 升级为接收第 1 个参数 %1 决定业务线，定时任务 /tr 末尾传入 {biz_line}，同一份 bat 复用服务多业务线（效贷/泾渭云/效融/小贷/智慧记+运营系统/智慧记零售/AI进销存），彻底去掉硬编码；配套效贷测试专家 agent v1.6.3 在业务线确定后强制校验 mysql_config.json 真实生成才算闭环。
 - v5.4：强化「立即触发 + 阻塞下一步」——修复实际测试中步骤完成后 AI 跳过时间收集、直接展示「下一步」选项的问题；5 个环节产出交付后必须先完成时间收集（通报 → 询问 → 解析 → 二次确认 → 写本地 JSONL），确认记录完成后才允许展示下一步选项
 - v5.6：team_roster.yaml 的 members 名单清空（运行时身份识别早已迁至 MySQL `agent_team_roster`，yaml 不再作为数据源）；同步将全部文档/脚本中「改 yaml → `sync_roster_to_mysql.py` 推 MySQL」的维护口径统一改为「管理员直接 INSERT/UPDATE MySQL `agent_team_roster` 表」，并给 `sync_roster_to_mysql.py` 加【已弃用】提示（误运行不改动 MySQL 数据）；zip 内嵌的 team_roster.yaml 随之更新为空 members。
 - v5.7：时间记录增加 `agent_start_time` / `agent_end_time` / `agent_duration_minutes` 三个字段，`record_time_saved.py` 新增对应 CLI 参数，`sync_to_mysql.py` 在 upsert 时同步写入 MySQL `agent_time_tracking` 表，解决表中该三字段长期为 NULL 的问题；`prompts/time_tracking.md` 明确要求 AI 在步骤开始/结束时采集智能体执行耗时并传入脚本。
 - v5.8：定时任务自动注册从「提示词内联 3 条带 `<scripts目录>` 占位符的 schtasks 命令（模型无法可靠填出路径，导致其他电脑/测试人员从未真正建出任务）」改为**确定性脚本调用** `python scripts/register_sync_tasks.py --biz-line {biz_line}`；新增 `scripts/register_sync_tasks.py`（用 `__file__` 自定位 `sync_task.bat`、按业务线幂等注册 早/午/晚 三任务、注册失败给明确提示），彻底解决跨机器自动建任务的根因；注册时机从「MySQL 配置就绪后」提前到「业务线确定后」。
 - v5.10：统一完整步骤映射（新增 `00/05/08`，其中⑤=`AI 对比入库/05`、⑦=`SVN 归档上传/08`）；③与④改为可各自独立记录，同一会话两步均完成时合并为一条“生成用例（06）”，并提供 `update_step_metadata.py` 更新数据库字段注释。
 - 抽取日期：2026-08-18
+
+---
+
+## 9. 工时统计口径（管理员必读）
+
+`agent_time_tracking.step_code` 只落 **7 个值**（⓪ 与 ①、③ 与 ④ 在记录口径上做了归属/合并），与测试人员看到的"8 个阶段"不是一一对应。统计时务必按下方规则合并，否则阶段数会虚高或对不上。
+
+### 9.1 原始落库映射（数据库真实值）
+
+| 八阶段 | DB `step` | `step_code` | 记录方式 |
+|--------|-----------|-------------|----------|
+| ⓪ 导出需求 | 导出需求 | 00 | 单条独立记录 |
+| ① 转 MD | 文档整理 | 01 | 单条独立记录 |
+| ② 需求评审 | 需求评审 | 02 | 单条独立记录 |
+| ③ 生成测试用例 | 生成用例 | 06 | 单条（带 `session_id`） |
+| ④ 生成冒烟用例 | 生成用例 | 06 | 同会话合并进③；无③则独立记 06 |
+| ⑤ AI 对比入库 | AI 对比入库 | 05 | 单条独立记录 |
+| ⑦ SVN 归档上传 | SVN 归档上传 | 08 | 单条独立记录 |
+| ⑧ 需求归档 | 入库知识库 | 07 | 单条独立记录 |
+
+> 八阶段里**没有"步骤⑥"编号**：③与④共用 `06` 是刻意设计（用例与冒烟用例合并统计更贴近"生成用例"总耗时）。
+
+### 9.2 汇报合并规则
+
+| 报表阶段 | 含原始 step_code | 说明 |
+|----------|------------------|------|
+| 文档整理 | 00 + 01 | ⓪ 导出需求是文档整理前置，汇总时并入文档整理 |
+| 需求评审 | 02 | 直接对应 |
+| 生成用例 | 06（含③+④） | 同会话内③与④已合并为一条 06 |
+| 入库知识库 | 07 | 直接对应 |
+| 辅助 · AI 对比入库 | 05 | 单列，分析该环节节省 |
+| 辅助 · SVN 归档上传 | 08 | 单列，分析该环节节省 |
+
+- ⓪ 在数据库**仍独立记 `00`**（保留导出耗时粒度），"并入文档整理"只在**汇总报表**发生时。
+- `hours`（员工节省工时）与 `agent_duration_minutes`（智能体执行耗时）是**两个不同口径**，不可混用、勿相加。
+
+### 9.3 汇报口径 SQL（⓪ 并入文档整理）
+
+```sql
+SELECT biz_line_code,
+       CASE step_code WHEN '00' THEN '01' ELSE step_code END AS report_step_code,
+       CASE step_code
+            WHEN '00' THEN '文档整理'  WHEN '01' THEN '文档整理'
+            WHEN '02' THEN '需求评审'  WHEN '06' THEN '生成用例'
+            WHEN '05' THEN 'AI对比入库' WHEN '08' THEN 'SVN归档上传'
+            WHEN '07' THEN '入库知识库'
+       END AS report_step,
+       COUNT(*)              AS records,
+       ROUND(SUM(hours), 2) AS total_saved_hours
+FROM   agent_time_tracking
+WHERE  biz_line_code = 'ZHJ'     -- 换业务线改编码：AIJXC / ZHJLS / AILIT
+GROUP  BY biz_line_code, report_step_code, report_step
+ORDER  BY report_step_code;
+```
+
+### 9.4 按业务线汇总所有员工 · 月度节省工时
+
+```sql
+SELECT biz_line_code,
+       employee,
+       DATE_FORMAT(COALESCE(timestamp, date), '%Y-%m')        AS month,
+       COUNT(*)                                            AS records,
+       ROUND(SUM(hours), 2)                                AS saved_hours,
+       ROUND(SUM(agent_duration_minutes) / 60.0, 2)        AS agent_hours
+FROM   agent_time_tracking
+WHERE  active = 1
+GROUP  BY biz_line_code, employee, month
+ORDER  BY biz_line_code, employee, month;
+```
+
+> 把结果（CSV 列：biz_line_code, employee, month, saved_hours, agent_hours）粘贴进配套 HTML 月报模板，即可生成趋势图与员工排行。完整版见独立文档《智慧记测试专家-工时统计口径说明.md》。
+
+> 完整版（原始视图、按人员汇总、月度汇总、常见疑问）见独立文档《智慧记测试专家-工时统计口径说明.md》。
