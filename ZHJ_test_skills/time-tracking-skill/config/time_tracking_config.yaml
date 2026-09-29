@@ -3,9 +3,9 @@
 #
 # ★★★ 部署必改：default_biz_line ★★★
 # 每个团队部署本 skill 后，将 default_biz_line 设置为自己的业务线名称。
-# 支持的业务线：效贷 / 泾渭云 / 效融 / 小贷 / 智慧记+运营系统 / AI进销存 / 智慧记零售 / 国际版Ailit
-# 编码对照：XD / JWY / XR / XXD / ZHJ / AIJXC / ZHJLS / AILIT（见 scripts/biz_line_helper.py）
-# ⚠️ 智慧记是三个子业务线的统称（ZHJ 智慧记+运营系统 / AIJXC AI进销存 / ZHJLS 智慧记零售），
+# 支持的业务线：效贷 / 泾渭云 / 效融 / 小贷 / 智慧记+运营系统 / 智慧记零售 / AI进销存 / 国际版Ailit
+# 编码对照：XD / JWY / XR / XXD / ZHJ / ZHJLS / AIJXC / AILIT（见 scripts/biz_line_helper.py）
+# ⚠️ 智慧记是三个子业务线的统称（ZHJ 智慧记+运营系统 / ZHJLS 智慧记零售 / AIJXC AI进销存），
 #    部署时必须填具体子业务线全称（如 "智慧记+运营系统"），不可填统称"智慧记"，
 #    否则业务线编码无法正确映射、数据会落错目录。
 # AI 调用脚本时也可通过 --biz-line 参数临时覆盖。
