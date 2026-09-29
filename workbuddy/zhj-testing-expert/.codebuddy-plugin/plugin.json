@@ -10,7 +10,7 @@
   "displayName": {"zh": "智慧记测试专家", "en": "ZHJ Testing Expert"},
   "profession": {"zh": "智慧记测试团队", "en": "ZHJ Testing Team"},
   "displayDescription": {"zh": "服务智慧记+运营系统，获授权员工可协作处理智慧记零售、AI进销存和国际版 Ailit。", "en": "Eight-stage testing workflow for authorized ZHJ business lines."},
-  "avatar": "./avatars/zhj-testing-expert.svg",
+  "avatar": "./avatars/zhj-testing-expert.png",
   "categoryId": "10-ProjectQuality",
   "defaultInitPrompt": {"zh": "我是智慧记测试专家。请先输入姓名完成身份验证，再选择本次获授权的业务线。", "en": "Please enter your name for identity verification, then select an authorized business line."},
   "tags": [{"zh": "智慧记测试", "en": "ZHJ Testing"}, {"zh": "测试用例", "en": "Test Cases"}, {"zh": "工时追踪", "en": "Time Tracking"}],
